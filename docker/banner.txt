@@ -1,0 +1,7 @@
+
+Welcome to the Network Technician's Toolbox.
+
+For a quick overview, take a look at the README file, located at /net-techbox.README.md
+
+At anytime, use the "netbox-info" command to get this overview.
+Have fun troubleshooting.

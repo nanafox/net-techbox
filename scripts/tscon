@@ -1,0 +1,254 @@
+#!/bin/bash
+
+# Program: Extended Ping
+# Author: Maxwell Nana Forson <nanaforsonjnr@gmail.com>
+	# </>theLazyProgrammer^_^
+# Date: Tue Feb 22, 2022
+# A simple bash script to emulate the ping command with some friendliness
+# This was actually inspired by Cisco's extended ping feature. Thought I might
+# script a lazy man's version out of it.
+
+# set default ping count here.
+DEFAULT_PING_COUNT=5
+
+function welcome_screen {
+	clear
+	echo "EXTENDED PING"
+	echo "============="
+	echo "Default ping count is $DEFAULT_PING_COUNT, but can be changed."
+	echo "NB: Name resolution is not used to enhance ping experience."
+
+	# show active interfaces
+	get_active_ifaces
+}
+
+function get_active_ifaces {
+	# uses the Network Manager CLI to retrieve all active interface 
+	# (Interfaces in up/up state and configured with an IP address). 
+	# An array or list is created from the output
+	active_interfaces=($(ip -o link | awk '{print $2}' | cut -f 1 -d '@' | tr -d ':'))
+
+	# now, get the destination network address from user
+	get_dst_addr
+}
+
+function get_dst_addr {
+	# gets the destination IP address
+	echo ""
+	echo -n "Enter destination network address (IP or DNS name): "
+	read dst_net
+
+	if [ ! $dst_net ]; then
+		# exit if no destination network address is given.
+		echo ""
+		echo "No destination network received."
+		echo "Exiting..."
+
+		exit 10
+
+	else
+		# get ready to rumble
+		display_active_interfaces
+		perform_connection_test
+
+	fi
+}
+
+function display_active_interfaces {
+	echo ""
+	echo "ACTIVE INTERFACES"
+	echo "================="
+
+	# loop through active interfaces and display them to user for selection
+	iface_num=0
+	for _ in ${active_interfaces[@]}; do
+		echo "$(expr $iface_num + 1). ${active_interfaces[iface_num]}"
+		iface_num=$(expr $iface_num + 1)
+	done
+
+	# get user preferred source interface for ping
+	get_src_interface
+	# get packet size
+	get_packet_size
+	# get TTL value
+	get_ttl_value
+}
+
+function get_src_interface {
+	# get the source interface for the ping
+	echo ""
+	echo "NB: USE NUMBERS ONLY"
+	echo -n "Which interface do you want to ping from? (Enter for Default): "
+	read src_interface
+
+	# get number of icmp packets to send
+	get_ping_count
+}
+
+function get_ping_count {
+	# ask user the number of ICMP to send
+	# if user enter the number 0 (zero), they ping continously
+	echo ""
+	echo "Number of ICMP packets to send"
+	echo -n "(Type 0 for continous ping or Enter for Default): "
+	read ping_count
+}
+
+function get_packet_size {
+	# gets packet size and injects it into the ping
+	echo -n "Packet size to send (Enter for Default): "
+	read packet_size
+}
+
+function get_ttl_value {
+	# gets the defined TTL and injects it into the ping
+	echo -n "Time to Live (Enter for Default): "
+	read ttl_value
+}
+
+function continous_ping_warning {
+	# Continous pings are indefinite loops, it keeps going forever.
+	# Displays a warning message to user and tells them how to stop the pings
+	echo ""
+	echo "WARNING: You are using Continuous pings."
+	echo "Use the break sequence to exit"
+	echo ""
+}
+
+function perform_connection_test {
+	# performs ping with the interface specified by the user
+	if [ $src_interface ]; then
+		if [ $ping_count -eq 0 2> /dev/null ]; then
+			# ping continously
+			# check if more parameters were received (i.e. Packet size and TTL value)
+			continuous_ping_warn
+			if [ ! -z $packet_size -a ! -z $ttl_value 2> /dev/null ]; then 
+				# both TTL and packet size injected into ping
+				ping -n $dst_net -M dont -s $packet_size -t $ttl_value -I ${active_interfaces[$(expr $src_interface - 1)]}
+			
+			elif [ $packet_size ]; then
+				# packet size injected into ping
+				ping -n $dst_net -M dont -s $packet_size -I ${active_interfaces[$(expr $src_interface - 1)]}
+			
+			elif [ $ttl_value ]; then
+				# TTL value injected into ping
+				ping -n -t $ttl_value -I ${active_interfaces[$(expr $src_interface - 1)]}
+			
+			else
+				ping -n $dst_net -I ${active_interfaces[$(expr $src_interface - 1)]}
+			fi
+
+		elif [ $ping_count -ne 0 2> /dev/null ]; then 
+			# check if more parameters were received (i.e. Packet size and TTL value)
+			
+			if [ ! -z $packet_size -a ! -z $ttl_value 2> /dev/null ]; then 
+				# both TTL and packet size injected into ping
+				ping -nc $ping_count $dst_net -M dont -s $packet_size -t $ttl_value -I ${active_interfaces[$(expr $src_interface - 1)]}
+			
+			elif [ $packet_size ]; then
+				# packet size injected into ping
+				ping -nc $ping_count $dst_net -M dont -s $packet_size -I ${active_interfaces[$(expr $src_interface - 1)]}
+			
+			elif [ $ttl_value ]; then
+				# TTL value injected into ping
+				ping -nc $ping_count $dst_net -t $ttl_value -I ${active_interfaces[$(expr $src_interface - 1)]}
+			
+			else
+				# proceed to ping with only the specified ping count
+				ping -nc $ping_count $dst_net -I ${active_interfaces[$(expr $src_interface - 1)]}
+			fi
+
+		else
+			# use default ping count
+			# check if more parameters were received (i.e. Packet size and TTL value)
+			
+			if [ ! -z $packet_size -a ! -z $ttl_value 2> /dev/null ]; then 
+				# both TTL and packet size injected into ping
+				ping -nc $ping_count $dst_net -M dont -s $packet_size -t $ttl_value -I ${active_interfaces[$(expr $src_interface - 1)]}
+			
+			elif [ $packet_size ]; then
+				# packet size injected into ping
+				ping -nc $ping_count $dst_net -M dont -s $packet_size -I ${active_interfaces[$(expr $src_interface - 1)]}
+			
+			elif [ $ttl_value ]; then
+				# TTL value injected into ping
+				ping -nc $ping_count $dst_net -t $ttl_value -I ${active_interfaces[$(expr $src_interface - 1)]}
+			
+			else
+				# proceed to ping with only the specified ping count
+				ping -nc $DEFAULT_PING_COUNT $dst_net -I ${active_interfaces[$(expr $src_interface - 1)]}
+			fi
+		fi
+	
+	# default pinging behavior, uses default outgoing interface
+	elif [ $dst_net ]; then
+		echo ""
+		if [ $ping_count -eq 0 2> /dev/null ]; then 
+			# ping continously
+			continous_ping_warning
+			
+			if [ ! -z $packet_size -a ! -z $ttl_value 2> /dev/null ]; then 
+				# both TTL value and packet size injected into ping
+				ping -n $dst_net -M dont -s $packet_size -t $ttl_value
+			
+			elif [ $packet_size ]; then
+				# packet size injected into ping
+				ping -n $dst_net -M dont -s $packet_size
+			
+			elif [ $ttl_value ]; then
+				# TTL value injected into ping
+				ping -n $dst_net -t $ttl_value
+			
+			else
+				ping -n $dst_net
+			fi
+
+		elif [ $ping_count -ne 0 2> /dev/null ]; then
+			# use specified ping count
+			if [ ! -z $packet_size -a ! -z $ttl_value 2> /dev/null ]; then 
+				# both TTL value and packet size injected into ping
+				ping -nc $ping_count $dst_net -s $packet_size -t $ttl_value
+			
+			elif [ $packet_size ]; then
+				# packet size injected into ping
+				ping -nc $ping_count $dst_net -s $packet_size
+			
+			elif [ $ttl_value ]; then
+				# TTL value injected into ping
+				ping -nc $ping_count $dst_net -t $ttl_value
+			
+			else
+				# ping with number of counts received only. No extra parameters
+				ping -nc $ping_count $dst_net
+			fi
+
+		else
+			# use default ping count
+			if [ ! -z $packet_size -a ! -z $ttl_value 2> /dev/null ]; then 
+				# both TTL value and packet size injected into ping
+				ping -nc $DEFAULT_PING_COUNT $dst_net -s $packet_size -t $ttl_value
+			
+			elif [ $packet_size ]; then
+				# packet size injected into ping
+				ping -nc $DEFAULT_PING_COUNT $dst_net -s $packet_size
+			
+			elif [ $ttl_value ]; then
+				# TTL value injected into ping
+				ping -nc $DEFAULT_PING_COUNT $dst_net -t $ttl_value
+			
+			else
+				# use default pinging.
+				ping -nc $DEFAULT_PING_COUNT $dst_net
+			fi
+		fi
+	fi
+}
+
+function run_ext_ping {
+	# my little "main" function. This is where it all begins
+	welcome_screen
+}
+
+
+# run program
+run_ext_ping
