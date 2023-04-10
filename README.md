@@ -91,3 +91,7 @@ This container works well in network simulation softwares
 
 - Here is an example of it on GNS3
   ![gns3_lab](https://bit.ly/3G6nej2)
+
+## LICENSE
+
+This project is licensed under the [MIT License](LICENSE)
